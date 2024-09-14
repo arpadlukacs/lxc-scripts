@@ -1,0 +1,76 @@
+#!/bin/bash
+
+help() {
+  echo -e "This tool generates commands to configure specific services on an Ubuntu based host.\n"
+  echo -e "Usage:\n  `basename $0` functionality\n"
+  echo -e "Supported functionalities:"
+  echo -e "  php7.4\tNGINX, MariaDB, PHP7.4 (default)\n"
+}
+
+php_config() {
+  cat <<EOF
+apt-get update
+apt-get upgrade -y
+apt install -y software-properties-common
+add-apt-repository -y ppa:ondrej/php
+apt-get update -y
+apt install -y ssmtp mc mariadb-server nginx php7.4-fpm php7.4-{cli,common,curl,intl,zip,gd,mysql,xml,mbstring,json,mcrypt}
+
+# securing mysql installation
+mysql -uroot <<_EOF_
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+_EOF_
+
+mysqladmin password "${DB_ROOT_PASSWD}"
+
+echo "upload_max_filesize = 20M" > /etc/php/7.4/fpm/conf.d/99-filesize.ini
+echo "max_file_uploads = 20" >> /etc/php/7.4/fpm/conf.d/99-filesize.ini
+cat <<'NGINX_EOF' > "/etc/nginx/sites-available/default"
+server {
+  listen 80 default_server;
+  server_name _;
+  root   /var/www/html;
+
+  index  index.php;
+
+  client_max_body_size 20m;
+  client_body_timeout 60;
+  client_body_buffer_size 20m;
+
+  location / {
+      try_files \$uri \$uri/ @rewrite;
+  }
+
+  location @rewrite {
+    rewrite ^/(.*)$ /index.php?\$1&\$args last;
+  }
+
+  location ~ \.php$ {
+    include snippets/fastcgi-php.conf;
+    fastcgi_pass unix:/var/run/php/php-fpm.sock;
+  }
+}
+NGINX_EOF
+EOF
+}
+
+if [ $# -eq 0 ]; then
+  help
+  exit 0
+fi
+
+DB_ROOT_PASSWD=root
+
+FUNC=$1
+
+if [ "$FUNC" = "php7.4" ]; then
+  php_config
+else
+  echo -e "ERROR: Unsupported functionality\n"
+  help
+  exit 1
+fi

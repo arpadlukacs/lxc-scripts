@@ -1,0 +1,2 @@
+SCRIPTS=(lxc_wizard create_lxc_container lxc_delete lxc_manage lxc_map_folder add_host)
+SCRIPTS+=(lxc_remove_mappings lxc_select_container lxc_select_device setup_services setup_ssh_access)

@@ -1,0 +1,78 @@
+#!/bin/bash
+
+script_name=`basename ${0}`
+
+source ./install_gum
+
+IMAGE="ubuntu:22.04"
+FORCE=false
+SETUP_SSH=false
+
+if [ $# -eq 0 ]; then
+  echo -e "This tool creates LXC instances when they do not exist yet\n"
+  echo -e "Usage:\n  ${script_name} [options] name\n"
+  echo "Options:"
+  echo -e "  -i\tspecify the image for LXC eg. ${IMAGE} (default)"
+  echo -e "  -f\tre-create the container if it exists"
+  echo -e "  -s\tadd hostname to /etc/hosts and setup SSH access with a generated key"
+fi
+
+while getopts i:sf opt; do
+  case "$opt" in
+    i) IMAGE="$OPTARG" ;;
+    s) SETUP_SSH=true ;;
+    f) FORCE=true ;;
+     *) echo "Unknown option ${opt}" ;;
+  esac
+done
+
+shift $[ $OPTIND - 1 ]
+CONTAINER_NAME=$1
+INTERACTIVE_MODE=false
+
+if [ $# -eq 0 ]; then
+  INTERACTIVE_MODE=true
+  echo -e "\nNo options, entering interactive mode\n"
+  CONTAINER_NAME=$(gum input --placeholder "Name of the new container")
+fi
+
+if [ -z "$CONTAINER_NAME" ]; then
+  exit
+fi
+
+LIST=`lxc ls -c n -f csv ${CONTAINER_NAME}`
+PREFIX=""
+
+if [[ "$LIST" =~ "${CONTAINER_NAME}" ]]; then
+  if [ "$INTERACTIVE_MODE" = true ]; then
+    answer=$(gum confirm "${CONTAINER_NAME} already exists, do you want to remove it and re-create it?")
+    if [ $? -eq 0 ]; then
+      FORCE=true
+    fi
+  fi
+  if [ "$FORCE" = true ]; then
+    PREFIX="Re-creating"
+    gum spin -s line -a right --title "Deleting container" -- lxc delete -f ${CONTAINER_NAME}
+  else
+    echo "${script_name}: The ${CONTAINER_NAME} container already exists."
+    exit 0
+  fi
+else
+  PREFIX="Creating"
+fi
+
+MSG="${PREFIX} ${IMAGE} container with the name ${CONTAINER_NAME}..."
+gum spin -s line -a right --title "${MSG}" -- lxc -q launch "${IMAGE}" "${CONTAINER_NAME}"
+
+if [ "$INTERACTIVE_MODE" = true ]; then
+  echo "The container is ready. Do you want to configure passwordless SSH access?"
+  CHOICE=$(gum choose --item.foreground 250 "Yes" "No")
+  if [ "${CHOICE}" == "Yes" ]; then
+    SETUP_SSH=true
+  fi
+fi
+
+if [ "$SETUP_SSH" = true ]; then
+  gum spin -a right -s line --title "Waiting 10 seconds for the container" -- sleep 10
+  setup_ssh_access -n "${CONTAINER_NAME}"
+fi

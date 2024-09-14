@@ -1,0 +1,37 @@
+#!/bin/bash
+
+script_name=`basename ${0}`
+
+source ./install_gum
+
+if [ $# -eq 0 ]; then
+  echo -e "This tool maps host folders to a container.\n"
+  echo -e "Usage:\n  ${script_name} container_name device_name source_path_on_host target_path_on_container\n"
+fi
+
+if [ $# -gt 0 ]; then
+  CONTAINER_NAME="$1"
+fi
+if [ $# -eq 4 ]; then
+  DEVICE_NAME="$2"
+  SOURCE_PATH="$3"
+  TARGET_PATH="$4"
+else
+  CONTAINER_NAME=$(lxc_select_container)
+  echo "Adding mapped folder to ${CONTAINER_NAME}, use right arrow key to enter a directory"
+  DEVICE_NAME=$(gum input --placeholder "Name of the new device" --value "${2}")
+  SOURCE_PATH=$(gum file --directory ${HOME})
+  TARGET_PATH=$(gum input --placeholder "Target path in container" --value "${4}")
+fi
+
+lxc stop "${CONTAINER_NAME}" 1>/dev/null 2>/dev/null
+
+lxc config device remove ${CONTAINER_NAME} ${DEVICE_NAME} 1>/dev/null 2>/dev/null
+
+lxc config device add ${CONTAINER_NAME} \
+  ${DEVICE_NAME} disk source=${SOURCE_PATH} \
+  path=${TARGET_PATH} #readonly=true
+
+lxc start "${CONTAINER_NAME}" 1>/dev/null 2>/dev/null
+
+lxc config device show ${CONTAINER_NAME}

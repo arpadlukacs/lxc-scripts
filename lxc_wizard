@@ -1,0 +1,14 @@
+#!/bin/bash
+
+script_name=`basename ${0}`
+
+source ./install_gum
+
+ACTION=$(gum choose "create" "delete" "manage")
+
+case "${ACTION}" in
+  create) create_lxc_container ;;
+  delete) lxc_delete ;;
+  manage) lxc_manage ;;
+   *) echo "Unknown option" ;;
+esac

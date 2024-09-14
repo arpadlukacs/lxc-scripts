@@ -1,0 +1,6 @@
+#!/bin/bash
+
+source ./install_gum
+
+CONTAINER_NAME=`lxc_select_container`
+gum spin -s line -a right --title "Deleting container..." -- lxc delete -f ${CONTAINER_NAME}

@@ -1,0 +1,54 @@
+#!/bin/bash
+
+if [ $# -eq 0 ]; then
+  echo -e "This tool adds hostnames for an LXC container to /etc/hosts.\n"
+  echo -e "Usage:\n  $(basename $0) container_name [hostname_1] [hostname_2] ... [hostname_n]\n"
+fi
+
+CONTAINER_NAME="$1"
+if [ -z "$CONTAINER_NAME" ]; then
+  echo "The container name is required."
+  exit 1
+fi
+
+shift
+
+lxc start "${CONTAINER_NAME}" 1>/dev/null 2>/dev/null
+
+hostnames=()
+
+while [ $# -ge 1 ]; do
+  if [ -n "$1" ]; then
+    hostnames+=( $1 )
+  fi
+  shift
+done
+
+if [ ${#hostnames[@]} -eq 0 ]; then
+  echo "Using hostname generated from the container name"
+  hostnames+=( "${CONTAINER_NAME}.arch" )
+fi
+
+IPv4=$(lxc ls -cn4 -f csv|grep "${CONTAINER_NAME},"|cut -d"," -f2|cut -d" " -f1)
+IPv6=$(lxc ls -cn6 -f csv|grep "${CONTAINER_NAME},"|cut -d"," -f2|cut -d" " -f1)
+echo -n | sudo tee "/etc/hosts.d/99-hosts.lxc.${CONTAINER_NAME}"
+for host in ${hostnames[@]}; do
+  if [ -n "$IPv4" ]; then
+    echo "${IPv4} ${host}"|sudo tee -a "/etc/hosts.d/99-hosts.lxc.${CONTAINER_NAME}" 1>/dev/null
+  else
+    if [ -n "$IPv6" ]; then
+      echo "${IPv6} ${host}"|sudo tee -a "/etc/hosts.d/99-hosts.lxc.${CONTAINER_NAME}" 1>/dev/null
+    fi
+  fi
+done
+
+sudo touch "/etc/hosts.d/99-hosts.lxc.${CONTAINER_NAME}"
+
+for host in ${hostnames[@]}; do
+  ping -c1 $host 1>/dev/null 2>/dev/null
+  if [ $? -eq 0 ]; then
+    echo "Hostname ${host} added to /etc/hosts"
+  else
+    echo "Hostname ${host} could not be added to /etc/hosts"
+  fi
+done

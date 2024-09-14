@@ -1,0 +1,26 @@
+#!/bin/bash
+
+script_name=`basename ${0}`
+
+source ./install_gum
+
+if [ $# -eq 0 ]; then
+  CONTAINER_NAME=$(lxc_select_container)
+else
+  CONTAINER_NAME=$1
+fi
+
+LIST_OF_DEVICES=$(lxc config device show ${CONTAINER_NAME})
+if [ "$LIST_OF_DEVICES" == "{}" ]; then
+  exit 1
+fi
+
+DEVICES=$(lxc config device show ${CONTAINER_NAME} ${NAME}|grep -v "^\s.*"|cut -d: -f1|gum choose --no-limit)
+if [ -z "$DEVICES" ]; then
+  echo "${script_name}: Nothing selected, exiting"
+  exit 0
+fi
+
+#lxc config device show ${CONTAINER_NAME} ${NAME}
+
+echo "${DEVICES[@]}"

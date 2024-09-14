@@ -1,0 +1,50 @@
+#!/bin/bash
+
+script_name=`basename ${0}`
+
+source ./install_gum
+
+CONTAINER_NAME=$(lxc_select_container)
+AVAILABLE_ACTIONS=()
+
+LIST_OF_DEVICES=$(lxc_select_device ${CONTAINER_NAME})
+if [ $? -ne 0 ]; then
+    LIST_OF_DEVICES=()
+fi
+
+if [[ "${#LIST_OF_DEVICES[@]}" -gt 0 ]]; then
+  IFS=$'\n' read -r -d '' -a devices < <( echo "${LIST_OF_DEVICES[@]}"|grep -v "^\s.*"|cut -d: -f1 )
+  declare -p devices
+  declare -A devices_path
+  declare -A devices_source
+
+  for name in "${devices[@]}"
+  do
+    DEVICE_PATH=$(lxc config device get ${CONTAINER_NAME} ${name} path)
+    DEVICE_SOURCE=(lxc config device get ${CONTAINER_NAME} ${name} source)
+    echo "${DEVICE_SOURCE} -> ${DEVICE_PATH} as ${name}"
+    devices_path[$name]=$DEVICE_PATH
+    devices_source[$name]=$DEVICE_SOURCE
+  done
+
+  echo -e "Selected devices:\n${LIST_OF_DEVICES}"
+  echo "What do you want to do with them?"
+
+  AVAILABLE_ACTIONS+=("update")
+  AVAILABLE_ACTIONS+=("delete")
+else
+  AVAILABLE_ACTIONS+=("add")
+fi
+
+if [ "${#AVAILABLE_ACTIONS[@]}" = "1" ]; then
+  SUB_ACTION=${AVAILABLE_ACTIONS[0]}
+else
+  SUB_ACTION=$(gum choose --header "Select action:" "${AVAILABLE_ACTIONS[@]}")
+fi
+
+case "${SUB_ACTION}" in
+  add) lxc_map_folder $CONTAINER_NAME ;;
+  update) lxc_update_device $CONTAINER_NAME ;;
+  delete) lxc_remove_mappings $CONTAINER_NAME ;;
+   *) echo "Unknown option" ;;
+esac

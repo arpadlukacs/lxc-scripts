@@ -1,0 +1,5 @@
+#!/bin/bash
+
+source ./install_gum
+
+lxc ls -cn -fcsv | gum choose --header "Select container to manage:"

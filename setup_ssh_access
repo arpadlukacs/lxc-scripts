@@ -1,0 +1,85 @@
+#!/bin/bash
+
+script_name=`basename ${0}`
+
+if [ $# -eq 0 ]; then
+  echo -e "This tool generates an SSH key and sets up for a host. When the name of an Ubuntu based container is passed it will uploads the key to that host.\n"
+  echo -e "Usage:\n  ${script_name} [options] host\n"
+  echo "Options:"
+  echo -e "  -n\tname of the container to add the key to, without this option the script only generates the key"
+  echo -e "  -g\tgenerate a new key, the name can be given with the -k option"
+  echo -e "  -k keyname\tname of the key to generate or the an existing key to use. When not generating a new key, it defaults to the current user's id_rsa key. When generating a new key without specifying a name, it defaults to HOSTNAME_key."
+fi
+
+if [ $# -lt 1 ]; then
+  echo "Host is required"
+  exit 1
+fi
+
+NEW_KEY=false
+KEYNAME=""
+CONTAINER_NAME=""
+
+while getopts n:gk: opt; do
+  case "$opt" in
+    n) CONTAINER_NAME="$OPTARG" ;;
+    g) NEW_KEY=true ;;
+    k) KEYNAME="$OPTARG" ;;
+     *) echo "Unknown option ${opt}" ;;
+  esac
+done
+
+shift $[ $OPTIND - 1 ]
+
+HOST=$1
+KEYFILE=""
+
+if [ -z "$KEYNAME" ]; then
+  if [ "$NEW_KEY" = true ]; then
+    KEYNAME=`echo "${HOST}_key" | tr "." "_"`
+    KEYFILE="./${KEYNAME}"
+  else
+    KEYNAME="id_ed25519"
+    KEYFILE="${HOME}/.ssh/id_ed25519"
+  fi
+fi
+
+if [ "$NEW_KEY" = true ]; then
+  echo "Generating new key ${KEYFILE}"
+  ssh-keygen -f ${KEYNAME} -q -N ""
+  ssh-keygen -R "${HOST}"
+else
+  echo "Using existing key ${KEYFILE}"
+fi
+
+if [ -z "$CONTAINER_NAME" ]; then
+  echo "Missing container name"
+  exit
+fi
+
+add_host "${CONTAINER_NAME}"
+
+if [ -z "$HOST" ]; then
+  HOST="${CONTAINER_NAME}.arch"
+fi
+
+echo "Adding ${KEYFILE}.pub to the authorized_keys in the container"
+lxc file push ${KEYFILE}.pub ${CONTAINER_NAME}/home/ubuntu/.ssh/authorized_keys
+
+sed -i "/${HOST}/d" "${HOME}/.ssh/known_hosts"
+
+if [ "$NEW_KEY" = true ]; then
+  echo "Checking access with the generated key..."
+  ssh ubuntu@${HOST} -o "StrictHostKeyChecking no" -i ${KEYNAME} -C "echo hello from \`hostname -f\` using passwordless SSH access"
+  echo "${script_name}: Use \"ssh ubuntu@${HOST} -i ${KEYNAME}\" to login or even without the username, see below."
+else
+  echo "Checking access with the existing key..."
+  ssh ubuntu@${HOST} -o "StrictHostKeyChecking no" -C "echo hello from \`hostname -f\` using passwordless SSH access"
+  echo "${script_name}: Use \"ssh ubuntu@${HOST} to login or even without the username, see below"
+fi
+
+echo "If you want to login without specying the username, add the following to your .ssh/config:"
+echo "Host ${HOST}"
+echo -e "\tUser ubuntu"
+echo "and this line too when you are using a custom keyfile"
+echo -e "\tIdentityFile KEYFILE"

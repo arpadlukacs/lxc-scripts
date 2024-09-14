@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# this script should be sourced into your shell or script
+
+PATH="${PATH}:${HOME}/go/bin"
+
+if [[ ! `which gum` =~ "gum" ]]; then
+  echo "Installing gum"
+  go install github.com/charmbracelet/gum@latest
+  PATH="${PATH}:${HOME}/go/bin"
+fi

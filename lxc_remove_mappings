@@ -1,0 +1,28 @@
+#!/bin/bash
+
+script_name=`basename ${0}`
+
+if [ $# -eq 0 ]; then
+  echo -e "This tool removes all the configured devices from an LXC container.\n"
+  echo -e "Usage:\n  ${script_name} container_name\n"
+fi
+
+CONTAINER_NAME="$1"
+if [ -z "$CONTAINER_NAME" ]; then
+  echo "${script_name}: The container name is required."
+  exit 1
+fi
+
+ANY=$(lxc config device show ${CONTAINER_NAME})
+if [ "$ANY" = "{}" ]; then
+  echo "${script_name}: Container does not have any mapping, exiting"
+  exit 0
+fi
+
+IFS=$'\n' read -r -d '' -a devices < <( lxc config device show ${CONTAINER_NAME}|grep -v "^\s.*"|cut -d: -f1 )
+declare -p devices
+
+for name in "${devices[@]}"
+do
+  lxc config device remove ${CONTAINER_NAME} ${name}
+done
