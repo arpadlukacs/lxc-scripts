@@ -2,7 +2,8 @@
 
 script_name=`basename ${0}`
 
-source ./install_gum
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/install_gum"
 
 IMAGE="ubuntu:22.04"
 FORCE=false
