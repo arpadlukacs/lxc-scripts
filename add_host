@@ -14,25 +14,25 @@ fi
 shift
 
 lxc start "${CONTAINER_NAME}" 1>/dev/null 2>/dev/null
+MAINHOST="${CONTAINER_NAME}.arch"
 
-hostnames=()
-
+hostnames=($MAINHOST)
 while [ $# -ge 1 ]; do
   if [ -n "$1" ]; then
-    hostnames+=( $1 )
+    if [[ "$1" == *.* ]]; then
+      hostnames+=( $1 )
+    else
+      hostnames+=( "$1.$MAINHOST" )
+    fi
   fi
   shift
 done
-
-if [ ${#hostnames[@]} -eq 0 ]; then
-  echo "Using hostname generated from the container name"
-  hostnames+=( "${CONTAINER_NAME}.arch" )
-fi
 
 IPv4=$(lxc ls -cn4 -f csv|grep "${CONTAINER_NAME},"|cut -d"," -f2|cut -d" " -f1)
 IPv6=$(lxc ls -cn6 -f csv|grep "${CONTAINER_NAME},"|cut -d"," -f2|cut -d" " -f1)
 echo -n | sudo tee "/etc/hosts.d/99-hosts.lxc.${CONTAINER_NAME}"
 for host in ${hostnames[@]}; do
+  sed -i "/${host}/d" "${HOME}/.ssh/known_hosts"
   if [ -n "$IPv4" ]; then
     echo "${IPv4} ${host}"|sudo tee -a "/etc/hosts.d/99-hosts.lxc.${CONTAINER_NAME}" 1>/dev/null
   else

@@ -10,7 +10,7 @@ SETUP_SSH=false
 
 if [ $# -eq 0 ]; then
   echo -e "This tool creates LXC instances when they do not exist yet\n"
-  echo -e "Usage:\n  ${script_name} [options] name\n"
+  echo -e "Usage:\n  ${script_name} [options] name [hostname1] [hostname2]\n"
   echo "Options:"
   echo -e "  -i\tspecify the image for LXC eg. ${IMAGE} (default)"
   echo -e "  -f\tre-create the container if it exists"
@@ -28,6 +28,7 @@ done
 
 shift $[ $OPTIND - 1 ]
 CONTAINER_NAME=$1
+shift
 INTERACTIVE_MODE=false
 
 if [ $# -eq 0 ]; then
@@ -39,6 +40,14 @@ fi
 if [ -z "$CONTAINER_NAME" ]; then
   exit
 fi
+
+hostnames=()
+while [ $# -ge 1 ]; do
+  if [ -n "$1" ]; then
+    hostnames+=( $1 )
+  fi
+  shift
+done
 
 LIST=`lxc ls -c n -f csv ${CONTAINER_NAME}`
 PREFIX=""
@@ -74,5 +83,5 @@ fi
 
 if [ "$SETUP_SSH" = true ]; then
   gum spin -a right -s line --title "Waiting 10 seconds for the container" -- sleep 10
-  setup_ssh_access -n "${CONTAINER_NAME}"
+  setup_ssh_access -n "${CONTAINER_NAME}" "${hostnames[@]}"
 fi
